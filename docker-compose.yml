@@ -73,6 +73,8 @@ services:
       MINIO_OIDC_REDIRECT_URI: http://localhost:9001/oauth_callback
       MINIO_CLIENT_ID: minio-console
       MINIO_CLIENT_SECRET: minio-console-secret
+      SYSTEM_ROLES_CLIENT_ID: system-roles
+      SYSTEM_ROLES_CLAIM_NAME: system_roles
       MINIO_TEST_USERNAME: minio-user
       MINIO_TEST_PASSWORD: minio-user
     volumes:
@@ -92,8 +94,8 @@ services:
       MINIO_IDENTITY_OPENID_CONFIG_URL: http://keycloak:8080/realms/vkr/.well-known/openid-configuration
       MINIO_IDENTITY_OPENID_CLIENT_ID: minio-console
       MINIO_IDENTITY_OPENID_CLIENT_SECRET: minio-console-secret
+      MINIO_IDENTITY_OPENID_CLAIM_NAME: system_roles
       MINIO_IDENTITY_OPENID_DISPLAY_NAME: Keycloak
-      MINIO_IDENTITY_OPENID_ROLE_POLICY: consoleAdmin
       MINIO_IDENTITY_OPENID_REDIRECT_URI: http://localhost:9001/oauth_callback
       MINIO_IDENTITY_OPENID_SCOPES: openid,profile,email
 
@@ -103,6 +105,23 @@ services:
     depends_on:
       keycloak-init:
         condition: service_completed_successfully
+
+  minio-init:
+    image: minio/mc
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_started
+    environment:
+      MINIO_ALIAS: local
+      MINIO_URL: http://minio:9000
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      POLICIES_DIR: /policies
+    volumes:
+      - ./minio/init-minio.sh:/bootstrap/init-minio.sh:ro
+      - ./minio/policies:/policies:ro
+    entrypoint: ["/bin/sh", "/bootstrap/init-minio.sh"]
 
 volumes:
   postgres_data:

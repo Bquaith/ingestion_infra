@@ -15,6 +15,10 @@ MINIO_CONSOLE_URL="${MINIO_CONSOLE_URL:-http://localhost:9001}"
 MINIO_OIDC_REDIRECT_URI="${MINIO_OIDC_REDIRECT_URI:-http://localhost:9001/oauth_callback}"
 MINIO_CLIENT_ID="${MINIO_CLIENT_ID:-minio-console}"
 MINIO_CLIENT_SECRET="${MINIO_CLIENT_SECRET:-minio-console-secret}"
+
+SYSTEM_ROLES_CLIENT_ID="${SYSTEM_ROLES_CLIENT_ID:-system-roles}"
+SYSTEM_ROLES_CLAIM_NAME="${SYSTEM_ROLES_CLAIM_NAME:-system_roles}"
+
 MINIO_TEST_USERNAME="${MINIO_TEST_USERNAME:-minio-user}"
 MINIO_TEST_PASSWORD="${MINIO_TEST_PASSWORD:-minio-user}"
 
@@ -62,7 +66,7 @@ user_id() {
     head -n 1
 }
 
-role_exists() {
+realm_role_exists() {
   role_name="$1"
   kcadm get "roles/$role_name" -r "$KEYCLOAK_REALM" >/dev/null 2>&1
 }
@@ -72,6 +76,12 @@ client_uuid_by_client_id() {
   kcadm get clients -r "$KEYCLOAK_REALM" -q clientId="$target_client_id" |
     sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
     head -n 1
+}
+
+client_role_exists() {
+  client_uuid="$1"
+  role_name="$2"
+  kcadm get "clients/$client_uuid/roles/$role_name" -r "$KEYCLOAK_REALM" >/dev/null 2>&1
 }
 
 mapper_id_by_name() {
@@ -117,26 +127,14 @@ group_id() {
     done
 }
 
-delete_user_if_exists() {
-  username="$1"
-  uid="$(user_id "$username")"
-
-  if [ -z "$uid" ]; then
-    return
-  fi
-
-  log "Removing legacy user '$username'"
-  kcadm delete "users/$uid" -r "$KEYCLOAK_REALM" >/dev/null
-}
-
-delete_role_if_exists() {
+delete_realm_role_if_exists() {
   role_name="$1"
 
-  if ! role_exists "$role_name"; then
+  if ! realm_role_exists "$role_name"; then
     return
   fi
 
-  log "Removing legacy role '$role_name'"
+  log "Removing legacy realm role '$role_name'"
   kcadm delete "roles/$role_name" -r "$KEYCLOAK_REALM" >/dev/null
 }
 
@@ -173,7 +171,7 @@ delete_mapper_if_exists() {
     return
   fi
 
-  log "Removing legacy protocol mapper '$target_mapper_name'"
+  log "Removing protocol mapper '$target_mapper_name'"
   kcadm delete "clients/$mapper_client_uuid/protocol-mappers/models/$mapper_id" -r "$KEYCLOAK_REALM" >/dev/null
 }
 
@@ -212,7 +210,7 @@ ensure_oidc_client() {
       -s "adminUrl=$MINIO_CONSOLE_URL" \
       -s "redirectUris=[\"$MINIO_OIDC_REDIRECT_URI\"]" \
       -s 'webOrigins=["+"]' >/dev/null
-      return
+    return
   fi
 
   log "Client '$MINIO_CLIENT_ID' already exists"
@@ -228,6 +226,81 @@ ensure_oidc_client() {
     -s "adminUrl=$MINIO_CONSOLE_URL" \
     -s "redirectUris=[\"$MINIO_OIDC_REDIRECT_URI\"]" \
     -s 'webOrigins=["+"]' >/dev/null
+}
+
+ensure_system_roles_client() {
+  client_uuid="$(client_uuid_by_client_id "$SYSTEM_ROLES_CLIENT_ID")"
+
+  if [ -z "$client_uuid" ]; then
+    log "Creating system roles client '$SYSTEM_ROLES_CLIENT_ID'"
+    kcadm create clients -r "$KEYCLOAK_REALM" \
+      -s clientId="$SYSTEM_ROLES_CLIENT_ID" \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=false \
+      -s standardFlowEnabled=false \
+      -s directAccessGrantsEnabled=false \
+      -s serviceAccountsEnabled=false >/dev/null
+    return
+  fi
+
+  log "System roles client '$SYSTEM_ROLES_CLIENT_ID' already exists"
+  kcadm update "clients/$client_uuid" -r "$KEYCLOAK_REALM" \
+    -s enabled=true \
+    -s publicClient=false \
+    -s standardFlowEnabled=false \
+    -s directAccessGrantsEnabled=false \
+    -s serviceAccountsEnabled=false >/dev/null
+}
+
+ensure_client_role() {
+  client_uuid="$1"
+  role_name="$2"
+
+  if client_role_exists "$client_uuid" "$role_name"; then
+    log "System role '$role_name' already exists"
+    return
+  fi
+
+  log "Creating system role '$role_name'"
+  kcadm create "clients/$client_uuid/roles" -r "$KEYCLOAK_REALM" -s name="$role_name" >/dev/null
+}
+
+ensure_system_roles_mapper() {
+  minio_client_uuid="$(client_uuid_by_client_id "$MINIO_CLIENT_ID")"
+  system_roles_client_uuid="$(client_uuid_by_client_id "$SYSTEM_ROLES_CLIENT_ID")"
+  mapper_name="system-roles-claim"
+
+  if [ -z "$minio_client_uuid" ] || [ -z "$system_roles_client_uuid" ]; then
+    log "Unable to resolve clients for system roles mapper"
+    exit 1
+  fi
+
+  delete_mapper_if_exists "$minio_client_uuid" "groups-to-policy-claim"
+  delete_mapper_if_exists "$minio_client_uuid" "realm-roles-to-policy-claim"
+  delete_mapper_if_exists "$minio_client_uuid" "policy-to-console-admin"
+  delete_mapper_if_exists "$minio_client_uuid" "$mapper_name"
+
+  log "Creating protocol mapper '$mapper_name'"
+  kcadm create "clients/$minio_client_uuid/protocol-mappers/models" -r "$KEYCLOAK_REALM" -f - <<EOF >/dev/null
+{
+  "name": "$mapper_name",
+  "protocol": "openid-connect",
+  "protocolMapper": "oidc-usermodel-client-role-mapper",
+  "consentRequired": false,
+  "config": {
+    "introspection.token.claim": "true",
+    "multivalued": "true",
+    "userinfo.token.claim": "true",
+    "id.token.claim": "true",
+    "lightweight.claim": "false",
+    "access.token.claim": "true",
+    "claim.name": "$SYSTEM_ROLES_CLAIM_NAME",
+    "jsonType.label": "String",
+    "usermodel.clientRoleMapping.clientId": "$SYSTEM_ROLES_CLIENT_ID"
+  }
+}
+EOF
 }
 
 ensure_user() {
@@ -259,32 +332,34 @@ ensure_user() {
   kcadm set-password -r "$KEYCLOAK_REALM" --username "$username" --new-password "$password" >/dev/null
 }
 
-cleanup_legacy_state() {
-  delete_user_if_exists "producer"
-  delete_user_if_exists "consumer"
-  delete_user_if_exists "admin"
+sync_user_system_roles() {
+  username="$1"
+  shift
 
+  kcadm remove-roles -r "$KEYCLOAK_REALM" --uusername "$username" --cclientid "$SYSTEM_ROLES_CLIENT_ID" \
+    --rolename producer --rolename consumer --rolename admin >/dev/null 2>&1 || true
+
+  for role_name in "$@"; do
+    kcadm add-roles -r "$KEYCLOAK_REALM" --uusername "$username" --cclientid "$SYSTEM_ROLES_CLIENT_ID" \
+      --rolename "$role_name" >/dev/null
+  done
+}
+
+cleanup_legacy_state() {
   delete_group_if_exists "producer"
   delete_group_if_exists "consumer"
   delete_group_if_exists "admin"
 
-  delete_role_if_exists "producer"
-  delete_role_if_exists "consumer"
-  delete_role_if_exists "admin"
-  delete_role_if_exists "readwrite"
-  delete_role_if_exists "readonly"
-  delete_role_if_exists "consoleAdmin"
+  delete_realm_role_if_exists "producer"
+  delete_realm_role_if_exists "consumer"
+  delete_realm_role_if_exists "admin"
+  delete_realm_role_if_exists "readwrite"
+  delete_realm_role_if_exists "readonly"
+  delete_realm_role_if_exists "consoleAdmin"
 
   delete_client_if_exists "minio-producer"
   delete_client_if_exists "minio-consumer"
   delete_client_if_exists "minio-admin"
-
-  minio_client_uuid="$(client_uuid_by_client_id "$MINIO_CLIENT_ID")"
-  if [ -n "$minio_client_uuid" ]; then
-    delete_mapper_if_exists "$minio_client_uuid" "groups-to-policy-claim"
-    delete_mapper_if_exists "$minio_client_uuid" "realm-roles-to-policy-claim"
-    delete_mapper_if_exists "$minio_client_uuid" "policy-to-console-admin"
-  fi
 }
 
 main() {
@@ -292,8 +367,28 @@ main() {
   ensure_master_realm
   ensure_realm
   cleanup_legacy_state
+
   ensure_oidc_client
-  ensure_user "$MINIO_TEST_USERNAME" "$MINIO_TEST_PASSWORD" "MinIO" "User" "${MINIO_TEST_USERNAME}@local.test"
+  ensure_system_roles_client
+
+  system_roles_client_uuid="$(client_uuid_by_client_id "$SYSTEM_ROLES_CLIENT_ID")"
+  ensure_client_role "$system_roles_client_uuid" "producer"
+  ensure_client_role "$system_roles_client_uuid" "consumer"
+  ensure_client_role "$system_roles_client_uuid" "admin"
+  ensure_system_roles_mapper
+
+  ensure_user "admin" "admin" "Platform" "Admin" "admin@local.test"
+  sync_user_system_roles "admin" "admin"
+
+  ensure_user "consumer" "consumer" "Data" "Consumer" "consumer@local.test"
+  sync_user_system_roles "consumer" "consumer"
+
+  ensure_user "producer" "producer" "Data" "Producer" "producer@local.test"
+  sync_user_system_roles "producer" "producer"
+
+  ensure_user "$MINIO_TEST_USERNAME" "$MINIO_TEST_PASSWORD" "Multi" "Role User" "${MINIO_TEST_USERNAME}@local.test"
+  sync_user_system_roles "$MINIO_TEST_USERNAME" "producer" "consumer"
+
   log "Keycloak bootstrap completed"
 }
 
