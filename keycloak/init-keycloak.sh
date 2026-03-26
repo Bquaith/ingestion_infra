@@ -18,6 +18,10 @@ MINIO_CLIENT_SECRET="${MINIO_CLIENT_SECRET:-minio-console-secret}"
 
 SYSTEM_ROLES_CLIENT_ID="${SYSTEM_ROLES_CLIENT_ID:-system-roles}"
 SYSTEM_ROLES_CLAIM_NAME="${SYSTEM_ROLES_CLAIM_NAME:-system_roles}"
+INGESTION_SYSTEM_ROLE="${INGESTION_SYSTEM_ROLE:-ingestion_rw}"
+
+AIRFLOW_STS_CLIENT_ID="${AIRFLOW_STS_CLIENT_ID:-airflow-minio-sts}"
+AIRFLOW_STS_CLIENT_SECRET="${AIRFLOW_STS_CLIENT_SECRET:-airflow-minio-sts-secret}"
 
 MINIO_TEST_USERNAME="${MINIO_TEST_USERNAME:-minio-user}"
 MINIO_TEST_PASSWORD="${MINIO_TEST_PASSWORD:-minio-user}"
@@ -253,6 +257,35 @@ ensure_system_roles_client() {
     -s serviceAccountsEnabled=false >/dev/null
 }
 
+ensure_service_client() {
+  target_client_id="$1"
+  target_client_secret="$2"
+  client_uuid="$(client_uuid_by_client_id "$target_client_id")"
+
+  if [ -z "$client_uuid" ]; then
+    log "Creating service client '$target_client_id'"
+    kcadm create clients -r "$KEYCLOAK_REALM" \
+      -s clientId="$target_client_id" \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=false \
+      -s standardFlowEnabled=false \
+      -s directAccessGrantsEnabled=false \
+      -s serviceAccountsEnabled=true \
+      -s secret="$target_client_secret" >/dev/null
+    return
+  fi
+
+  log "Service client '$target_client_id' already exists"
+  kcadm update "clients/$client_uuid" -r "$KEYCLOAK_REALM" \
+    -s enabled=true \
+    -s publicClient=false \
+    -s standardFlowEnabled=false \
+    -s directAccessGrantsEnabled=false \
+    -s serviceAccountsEnabled=true \
+    -s secret="$target_client_secret" >/dev/null
+}
+
 ensure_client_role() {
   client_uuid="$1"
   role_name="$2"
@@ -267,22 +300,22 @@ ensure_client_role() {
 }
 
 ensure_system_roles_mapper() {
-  minio_client_uuid="$(client_uuid_by_client_id "$MINIO_CLIENT_ID")"
+  target_client_uuid="$1"
+  mapper_name="$2"
   system_roles_client_uuid="$(client_uuid_by_client_id "$SYSTEM_ROLES_CLIENT_ID")"
-  mapper_name="system-roles-claim"
 
-  if [ -z "$minio_client_uuid" ] || [ -z "$system_roles_client_uuid" ]; then
+  if [ -z "$target_client_uuid" ] || [ -z "$system_roles_client_uuid" ]; then
     log "Unable to resolve clients for system roles mapper"
     exit 1
   fi
 
-  delete_mapper_if_exists "$minio_client_uuid" "groups-to-policy-claim"
-  delete_mapper_if_exists "$minio_client_uuid" "realm-roles-to-policy-claim"
-  delete_mapper_if_exists "$minio_client_uuid" "policy-to-console-admin"
-  delete_mapper_if_exists "$minio_client_uuid" "$mapper_name"
+  delete_mapper_if_exists "$target_client_uuid" "groups-to-policy-claim"
+  delete_mapper_if_exists "$target_client_uuid" "realm-roles-to-policy-claim"
+  delete_mapper_if_exists "$target_client_uuid" "policy-to-console-admin"
+  delete_mapper_if_exists "$target_client_uuid" "$mapper_name"
 
   log "Creating protocol mapper '$mapper_name'"
-  kcadm create "clients/$minio_client_uuid/protocol-mappers/models" -r "$KEYCLOAK_REALM" -f - <<EOF >/dev/null
+  kcadm create "clients/$target_client_uuid/protocol-mappers/models" -r "$KEYCLOAK_REALM" -f - <<EOF >/dev/null
 {
   "name": "$mapper_name",
   "protocol": "openid-connect",
@@ -298,6 +331,34 @@ ensure_system_roles_mapper() {
     "claim.name": "$SYSTEM_ROLES_CLAIM_NAME",
     "jsonType.label": "String",
     "usermodel.clientRoleMapping.clientId": "$SYSTEM_ROLES_CLIENT_ID"
+  }
+}
+EOF
+}
+
+ensure_audience_mapper() {
+  target_client_uuid="$1"
+  mapper_name="$2"
+
+  if [ -z "$target_client_uuid" ]; then
+    log "Unable to resolve client for audience mapper '$mapper_name'"
+    exit 1
+  fi
+
+  delete_mapper_if_exists "$target_client_uuid" "$mapper_name"
+
+  log "Creating audience mapper '$mapper_name'"
+  kcadm create "clients/$target_client_uuid/protocol-mappers/models" -r "$KEYCLOAK_REALM" -f - <<EOF >/dev/null
+{
+  "name": "$mapper_name",
+  "protocol": "openid-connect",
+  "protocolMapper": "oidc-audience-mapper",
+  "consentRequired": false,
+  "config": {
+    "included.client.audience": "$MINIO_CLIENT_ID",
+    "id.token.claim": "false",
+    "access.token.claim": "true",
+    "introspection.token.claim": "true"
   }
 }
 EOF
@@ -337,10 +398,42 @@ sync_user_system_roles() {
   shift
 
   kcadm remove-roles -r "$KEYCLOAK_REALM" --uusername "$username" --cclientid "$SYSTEM_ROLES_CLIENT_ID" \
-    --rolename producer --rolename consumer --rolename admin >/dev/null 2>&1 || true
+    --rolename producer --rolename consumer --rolename admin --rolename "$INGESTION_SYSTEM_ROLE" >/dev/null 2>&1 || true
 
   for role_name in "$@"; do
     kcadm add-roles -r "$KEYCLOAK_REALM" --uusername "$username" --cclientid "$SYSTEM_ROLES_CLIENT_ID" \
+      --rolename "$role_name" >/dev/null
+  done
+}
+
+service_account_user_id() {
+  client_uuid="$1"
+  kcadm get "clients/$client_uuid/service-account-user" -r "$KEYCLOAK_REALM" |
+    sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' |
+    head -n 1
+}
+
+sync_service_account_system_roles() {
+  target_client_id="$1"
+  shift
+
+  target_client_uuid="$(client_uuid_by_client_id "$target_client_id")"
+  if [ -z "$target_client_uuid" ]; then
+    log "Unable to resolve service client '$target_client_id' for role sync"
+    exit 1
+  fi
+
+  service_user_id="$(service_account_user_id "$target_client_uuid")"
+  if [ -z "$service_user_id" ]; then
+    log "Unable to resolve service account user for '$target_client_id'"
+    exit 1
+  fi
+
+  kcadm remove-roles -r "$KEYCLOAK_REALM" --uid "$service_user_id" --cclientid "$SYSTEM_ROLES_CLIENT_ID" \
+    --rolename producer --rolename consumer --rolename admin --rolename "$INGESTION_SYSTEM_ROLE" >/dev/null 2>&1 || true
+
+  for role_name in "$@"; do
+    kcadm add-roles -r "$KEYCLOAK_REALM" --uid "$service_user_id" --cclientid "$SYSTEM_ROLES_CLIENT_ID" \
       --rolename "$role_name" >/dev/null
   done
 }
@@ -370,12 +463,18 @@ main() {
 
   ensure_oidc_client
   ensure_system_roles_client
+  ensure_service_client "$AIRFLOW_STS_CLIENT_ID" "$AIRFLOW_STS_CLIENT_SECRET"
 
   system_roles_client_uuid="$(client_uuid_by_client_id "$SYSTEM_ROLES_CLIENT_ID")"
+  minio_client_uuid="$(client_uuid_by_client_id "$MINIO_CLIENT_ID")"
+  airflow_sts_client_uuid="$(client_uuid_by_client_id "$AIRFLOW_STS_CLIENT_ID")"
   ensure_client_role "$system_roles_client_uuid" "producer"
   ensure_client_role "$system_roles_client_uuid" "consumer"
   ensure_client_role "$system_roles_client_uuid" "admin"
-  ensure_system_roles_mapper
+  ensure_client_role "$system_roles_client_uuid" "$INGESTION_SYSTEM_ROLE"
+  ensure_system_roles_mapper "$minio_client_uuid" "system-roles-claim"
+  ensure_system_roles_mapper "$airflow_sts_client_uuid" "system-roles-claim"
+  ensure_audience_mapper "$airflow_sts_client_uuid" "minio-console-audience"
 
   ensure_user "admin" "admin" "Platform" "Admin" "admin@local.test"
   sync_user_system_roles "admin" "admin"
@@ -388,6 +487,7 @@ main() {
 
   ensure_user "$MINIO_TEST_USERNAME" "$MINIO_TEST_PASSWORD" "Multi" "Role User" "${MINIO_TEST_USERNAME}@local.test"
   sync_user_system_roles "$MINIO_TEST_USERNAME" "producer" "consumer"
+  sync_service_account_system_roles "$AIRFLOW_STS_CLIENT_ID" "$INGESTION_SYSTEM_ROLE"
 
   log "Keycloak bootstrap completed"
 }

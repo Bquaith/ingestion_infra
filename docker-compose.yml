@@ -75,6 +75,9 @@ services:
       MINIO_CLIENT_SECRET: minio-console-secret
       SYSTEM_ROLES_CLIENT_ID: system-roles
       SYSTEM_ROLES_CLAIM_NAME: system_roles
+      INGESTION_SYSTEM_ROLE: ingestion_rw
+      AIRFLOW_STS_CLIENT_ID: airflow-minio-sts
+      AIRFLOW_STS_CLIENT_SECRET: airflow-minio-sts-secret
       MINIO_TEST_USERNAME: minio-user
       MINIO_TEST_PASSWORD: minio-user
     volumes:
@@ -118,6 +121,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
       POLICIES_DIR: /policies
+      LANDING_BUCKET_NAME: ingestion-landing
+      LANDING_BUCKET_ENABLE_VERSIONING: "true"
     volumes:
       - ./minio/init-minio.sh:/bootstrap/init-minio.sh:ro
       - ./minio/policies:/policies:ro

@@ -25,6 +25,7 @@
 - admin-пользователь
 - realm `vkr`
 - OIDC client `minio-console`
+- service client `airflow-minio-sts`
 - system roles client `system-roles`
 - системные роли `producer`, `consumer`, `admin`
 - демо-пользователи `producer`, `consumer`, `admin`
@@ -113,5 +114,25 @@ Mapping ролей в MinIO:
 - `admin` -> полный доступ
 - `consumer` -> чтение + изменение бакетов
 - `producer` -> только чтение
+- `ingestion_rw` -> чтение и запись в landing bucket `ingestion-landing`
 
 Если у пользователя несколько ролей, MinIO объединяет соответствующие policies.
+
+Для интеграционного контура Airflow также создается service client:
+
+- client id: `airflow-minio-sts`
+- client secret: `airflow-minio-sts-secret`
+
+Этот клиент получает системную роль `ingestion_rw`, а его access token дополнительно содержит:
+
+- claim `system_roles`
+- audience `minio-console`
+
+Это позволяет Airflow выполнять обмен:
+
+```text
+Keycloak client_credentials
+  -> JWT access token
+  -> MinIO AssumeRoleWithWebIdentity
+  -> temporary S3 credentials
+```
