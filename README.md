@@ -25,9 +25,15 @@
 - admin-пользователь
 - realm `vkr`
 - OIDC client `minio-console`
+- Airflow auth client `airflow-auth`
+- direct-grants client `contracts-client`
+- browser client `contracts-ui-dev`
+- audience client `contracts-api`
 - service client `airflow-minio-sts`
+- service client `airflow-contracts`
 - system roles client `system-roles`
-- системные роли `producer`, `consumer`, `admin`
+- системные роли `producer`, `consumer`, `admin`, `contracts_reader`
+- realm roles `Viewer`, `User`, `Op`, `Admin`, `SuperAdmin`
 - демо-пользователи `producer`, `consumer`, `admin`
 - multi-role пользователь `minio-user`
 
@@ -90,11 +96,23 @@ docker compose ps -a
 
 - realm: `vkr`
 - OIDC client: `minio-console`
+- Airflow auth client: `airflow-auth`
+- direct grants client: `contracts-client`
+- browser client: `contracts-ui-dev`
+- audience client: `contracts-api`
+- service client: `airflow-contracts`
 - system roles client: `system-roles`
 - demo users:
   `admin / admin`, `consumer / consumer`, `producer / producer`
 - multi-role user:
   `minio-user / minio-user` с ролями `producer + consumer`
+
+Для Airflow FAB OAuth SSO demo users дополнительно получают realm roles:
+
+- `admin` -> `SuperAdmin`
+- `producer` -> `User`
+- `consumer` -> `User + Op`
+- `minio-user` -> `User`
 
 ### MinIO
 
@@ -136,3 +154,36 @@ Keycloak client_credentials
   -> MinIO AssumeRoleWithWebIdentity
   -> temporary S3 credentials
 ```
+
+Для доступа к `data-contracts-service` также создаётся отдельный service client:
+
+- client id: `airflow-contracts`
+- client secret: `airflow-contracts-secret`
+- system role: `contracts_reader`
+- audience: `contracts-api`
+
+Это позволяет Airflow получать bearer token для contract registry отдельно от MinIO/STS-контура.
+
+Для browser-тестирования `/docs` также создаётся публичный OIDC client:
+
+- client id: `contracts-ui-dev`
+- flow: Authorization Code + PKCE
+- redirect URI: `http://localhost:8000/docs/oauth2-redirect`
+- audience: `contracts-api`
+
+Это позволяет логиниться в Swagger UI сервиса контрактов через Keycloak и тестировать методы прямо из браузера.
+
+Для Airflow FAB OAuth SSO также создаётся отдельный confidential client:
+
+- client id: `airflow-auth`
+- client secret: `airflow-auth-secret`
+- root URL: `http://localhost:8088`
+- redirect URI: `http://localhost:8088/auth/oauth-authorized/keycloak`
+- authentication flow:
+  - `Standard Flow = ON`
+  - `Direct Access Grants = ON`
+  - `Service Accounts Roles = OFF`
+  - `Authorization = OFF`
+
+Этот client используется Airflow UI для OAuth login через Keycloak. Доступы в самом UI потом
+разруливаются FAB-ролями Airflow, которые синхронизируются из `realm_access.roles` токена.

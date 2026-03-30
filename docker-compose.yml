@@ -78,6 +78,18 @@ services:
       INGESTION_SYSTEM_ROLE: ingestion_rw
       AIRFLOW_STS_CLIENT_ID: airflow-minio-sts
       AIRFLOW_STS_CLIENT_SECRET: airflow-minio-sts-secret
+      AIRFLOW_CONTRACTS_CLIENT_ID: airflow-contracts
+      AIRFLOW_CONTRACTS_CLIENT_SECRET: airflow-contracts-secret
+      AIRFLOW_AUTH_CLIENT_ID: airflow-auth
+      AIRFLOW_AUTH_CLIENT_SECRET: airflow-auth-secret
+      AIRFLOW_AUTH_ROOT_URL: http://localhost:8088
+      CONTRACTS_API_CLIENT_ID: contracts-api
+      CONTRACTS_CLIENT_ID: contracts-client
+      CONTRACTS_CLIENT_SECRET: contracts-client-secret
+      CONTRACTS_UI_DEV_CLIENT_ID: contracts-ui-dev
+      CONTRACTS_UI_DEV_ROOT_URL: http://localhost:8000
+      CONTRACTS_UI_DEV_REDIRECT_URI: http://localhost:8000/docs/oauth2-redirect
+      CONTRACTS_READER_ROLE: contracts_reader
       MINIO_TEST_USERNAME: minio-user
       MINIO_TEST_PASSWORD: minio-user
     volumes:

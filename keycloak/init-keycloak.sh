@@ -22,6 +22,18 @@ INGESTION_SYSTEM_ROLE="${INGESTION_SYSTEM_ROLE:-ingestion_rw}"
 
 AIRFLOW_STS_CLIENT_ID="${AIRFLOW_STS_CLIENT_ID:-airflow-minio-sts}"
 AIRFLOW_STS_CLIENT_SECRET="${AIRFLOW_STS_CLIENT_SECRET:-airflow-minio-sts-secret}"
+AIRFLOW_CONTRACTS_CLIENT_ID="${AIRFLOW_CONTRACTS_CLIENT_ID:-airflow-contracts}"
+AIRFLOW_CONTRACTS_CLIENT_SECRET="${AIRFLOW_CONTRACTS_CLIENT_SECRET:-airflow-contracts-secret}"
+AIRFLOW_AUTH_CLIENT_ID="${AIRFLOW_AUTH_CLIENT_ID:-airflow-auth}"
+AIRFLOW_AUTH_CLIENT_SECRET="${AIRFLOW_AUTH_CLIENT_SECRET:-airflow-auth-secret}"
+AIRFLOW_AUTH_ROOT_URL="${AIRFLOW_AUTH_ROOT_URL:-http://localhost:8088}"
+CONTRACTS_API_CLIENT_ID="${CONTRACTS_API_CLIENT_ID:-contracts-api}"
+CONTRACTS_CLIENT_ID="${CONTRACTS_CLIENT_ID:-contracts-client}"
+CONTRACTS_CLIENT_SECRET="${CONTRACTS_CLIENT_SECRET:-contracts-client-secret}"
+CONTRACTS_UI_DEV_CLIENT_ID="${CONTRACTS_UI_DEV_CLIENT_ID:-contracts-ui-dev}"
+CONTRACTS_UI_DEV_ROOT_URL="${CONTRACTS_UI_DEV_ROOT_URL:-http://localhost:8000}"
+CONTRACTS_UI_DEV_REDIRECT_URI="${CONTRACTS_UI_DEV_REDIRECT_URI:-http://localhost:8000/docs/oauth2-redirect}"
+CONTRACTS_READER_ROLE="${CONTRACTS_READER_ROLE:-contracts_reader}"
 
 MINIO_TEST_USERNAME="${MINIO_TEST_USERNAME:-minio-user}"
 MINIO_TEST_PASSWORD="${MINIO_TEST_PASSWORD:-minio-user}"
@@ -179,6 +191,18 @@ delete_mapper_if_exists() {
   kcadm delete "clients/$mapper_client_uuid/protocol-mappers/models/$mapper_id" -r "$KEYCLOAK_REALM" >/dev/null
 }
 
+ensure_realm_role() {
+  role_name="$1"
+
+  if realm_role_exists "$role_name"; then
+    log "Realm role '$role_name' already exists"
+    return
+  fi
+
+  log "Creating realm role '$role_name'"
+  kcadm create roles -r "$KEYCLOAK_REALM" -s name="$role_name" >/dev/null
+}
+
 ensure_master_realm() {
   log "Updating realm 'master' for local HTTP access"
   kcadm update realms/master -s sslRequired=NONE >/dev/null
@@ -286,6 +310,144 @@ ensure_service_client() {
     -s secret="$target_client_secret" >/dev/null
 }
 
+ensure_resource_client() {
+  target_client_id="$1"
+  client_uuid="$(client_uuid_by_client_id "$target_client_id")"
+
+  if [ -z "$client_uuid" ]; then
+    log "Creating resource client '$target_client_id'"
+    kcadm create clients -r "$KEYCLOAK_REALM" \
+      -s clientId="$target_client_id" \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=false \
+      -s standardFlowEnabled=false \
+      -s directAccessGrantsEnabled=false \
+      -s serviceAccountsEnabled=false >/dev/null
+    return
+  fi
+
+  log "Resource client '$target_client_id' already exists"
+  kcadm update "clients/$client_uuid" -r "$KEYCLOAK_REALM" \
+    -s enabled=true \
+    -s publicClient=false \
+    -s standardFlowEnabled=false \
+    -s directAccessGrantsEnabled=false \
+    -s serviceAccountsEnabled=false >/dev/null
+}
+
+ensure_direct_grants_client() {
+  target_client_id="$1"
+  target_client_secret="$2"
+  client_uuid="$(client_uuid_by_client_id "$target_client_id")"
+
+  if [ -z "$client_uuid" ]; then
+    log "Creating direct grants client '$target_client_id'"
+    kcadm create clients -r "$KEYCLOAK_REALM" \
+      -s clientId="$target_client_id" \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=false \
+      -s standardFlowEnabled=false \
+      -s directAccessGrantsEnabled=true \
+      -s serviceAccountsEnabled=false \
+      -s secret="$target_client_secret" >/dev/null
+    return
+  fi
+
+  log "Direct grants client '$target_client_id' already exists"
+  kcadm update "clients/$client_uuid" -r "$KEYCLOAK_REALM" \
+    -s enabled=true \
+    -s publicClient=false \
+    -s standardFlowEnabled=false \
+    -s directAccessGrantsEnabled=true \
+    -s serviceAccountsEnabled=false \
+    -s secret="$target_client_secret" >/dev/null
+}
+
+ensure_public_browser_client() {
+  target_client_id="$1"
+  target_root_url="$2"
+  target_redirect_uri="$3"
+  client_uuid="$(client_uuid_by_client_id "$target_client_id")"
+  target_docs_url="${target_root_url%/}/docs"
+
+  if [ -z "$client_uuid" ]; then
+    log "Creating browser client '$target_client_id'"
+    kcadm create clients -r "$KEYCLOAK_REALM" \
+      -s clientId="$target_client_id" \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=true \
+      -s standardFlowEnabled=true \
+      -s directAccessGrantsEnabled=false \
+      -s serviceAccountsEnabled=false \
+      -s "rootUrl=$target_root_url" \
+      -s "baseUrl=$target_docs_url" \
+      -s "redirectUris=[\"$target_redirect_uri\"]" \
+      -s "webOrigins=[\"$target_root_url\"]" >/dev/null
+    return
+  fi
+
+  log "Browser client '$target_client_id' already exists"
+  kcadm update "clients/$client_uuid" -r "$KEYCLOAK_REALM" \
+    -s enabled=true \
+    -s publicClient=true \
+    -s standardFlowEnabled=true \
+    -s directAccessGrantsEnabled=false \
+    -s serviceAccountsEnabled=false \
+    -s "rootUrl=$target_root_url" \
+    -s "baseUrl=$target_docs_url" \
+    -s "redirectUris=[\"$target_redirect_uri\"]" \
+    -s "webOrigins=[\"$target_root_url\"]" >/dev/null
+}
+
+ensure_airflow_auth_client() {
+  target_client_id="$1"
+  target_client_secret="$2"
+  target_root_url="$3"
+  client_uuid="$(client_uuid_by_client_id "$target_client_id")"
+  target_callback_uri="${target_root_url%/}/auth/oauth-authorized/keycloak"
+  target_redirect_root="${target_root_url%/}/*"
+
+  if [ -z "$client_uuid" ]; then
+    log "Creating Airflow auth client '$target_client_id'"
+    kcadm create clients -r "$KEYCLOAK_REALM" \
+      -s clientId="$target_client_id" \
+      -s enabled=true \
+      -s protocol=openid-connect \
+      -s publicClient=false \
+      -s standardFlowEnabled=true \
+      -s directAccessGrantsEnabled=true \
+      -s serviceAccountsEnabled=false \
+      -s authorizationServicesEnabled=false \
+      -s frontchannelLogout=true \
+      -s secret="$target_client_secret" \
+      -s "rootUrl=$target_root_url" \
+      -s "baseUrl=$target_root_url" \
+      -s "adminUrl=$target_root_url" \
+      -s "redirectUris=[\"$target_callback_uri\",\"$target_redirect_root\"]" \
+      -s "webOrigins=[\"$target_root_url\"]" >/dev/null
+    return
+  fi
+
+  log "Airflow auth client '$target_client_id' already exists"
+  kcadm update "clients/$client_uuid" -r "$KEYCLOAK_REALM" \
+    -s enabled=true \
+    -s publicClient=false \
+    -s standardFlowEnabled=true \
+    -s directAccessGrantsEnabled=true \
+    -s serviceAccountsEnabled=false \
+    -s authorizationServicesEnabled=false \
+    -s frontchannelLogout=true \
+    -s secret="$target_client_secret" \
+    -s "rootUrl=$target_root_url" \
+    -s "baseUrl=$target_root_url" \
+    -s "adminUrl=$target_root_url" \
+    -s "redirectUris=[\"$target_callback_uri\",\"$target_redirect_root\"]" \
+    -s "webOrigins=[\"$target_root_url\"]" >/dev/null
+}
+
 ensure_client_role() {
   client_uuid="$1"
   role_name="$2"
@@ -339,6 +501,7 @@ EOF
 ensure_audience_mapper() {
   target_client_uuid="$1"
   mapper_name="$2"
+  included_audience="$3"
 
   if [ -z "$target_client_uuid" ]; then
     log "Unable to resolve client for audience mapper '$mapper_name'"
@@ -355,7 +518,7 @@ ensure_audience_mapper() {
   "protocolMapper": "oidc-audience-mapper",
   "consentRequired": false,
   "config": {
-    "included.client.audience": "$MINIO_CLIENT_ID",
+    "included.client.audience": "$included_audience",
     "id.token.claim": "false",
     "access.token.claim": "true",
     "introspection.token.claim": "true"
@@ -398,10 +561,23 @@ sync_user_system_roles() {
   shift
 
   kcadm remove-roles -r "$KEYCLOAK_REALM" --uusername "$username" --cclientid "$SYSTEM_ROLES_CLIENT_ID" \
-    --rolename producer --rolename consumer --rolename admin --rolename "$INGESTION_SYSTEM_ROLE" >/dev/null 2>&1 || true
+    --rolename producer --rolename consumer --rolename admin --rolename "$INGESTION_SYSTEM_ROLE" --rolename "$CONTRACTS_READER_ROLE" >/dev/null 2>&1 || true
 
   for role_name in "$@"; do
     kcadm add-roles -r "$KEYCLOAK_REALM" --uusername "$username" --cclientid "$SYSTEM_ROLES_CLIENT_ID" \
+      --rolename "$role_name" >/dev/null
+  done
+}
+
+sync_user_realm_roles() {
+  username="$1"
+  shift
+
+  kcadm remove-roles -r "$KEYCLOAK_REALM" --uusername "$username" \
+    --rolename Viewer --rolename User --rolename Op --rolename Admin --rolename SuperAdmin >/dev/null 2>&1 || true
+
+  for role_name in "$@"; do
+    kcadm add-roles -r "$KEYCLOAK_REALM" --uusername "$username" \
       --rolename "$role_name" >/dev/null
   done
 }
@@ -430,7 +606,7 @@ sync_service_account_system_roles() {
   fi
 
   kcadm remove-roles -r "$KEYCLOAK_REALM" --uid "$service_user_id" --cclientid "$SYSTEM_ROLES_CLIENT_ID" \
-    --rolename producer --rolename consumer --rolename admin --rolename "$INGESTION_SYSTEM_ROLE" >/dev/null 2>&1 || true
+    --rolename producer --rolename consumer --rolename admin --rolename "$INGESTION_SYSTEM_ROLE" --rolename "$CONTRACTS_READER_ROLE" >/dev/null 2>&1 || true
 
   for role_name in "$@"; do
     kcadm add-roles -r "$KEYCLOAK_REALM" --uid "$service_user_id" --cclientid "$SYSTEM_ROLES_CLIENT_ID" \
@@ -464,30 +640,60 @@ main() {
   ensure_oidc_client
   ensure_system_roles_client
   ensure_service_client "$AIRFLOW_STS_CLIENT_ID" "$AIRFLOW_STS_CLIENT_SECRET"
+  ensure_airflow_auth_client "$AIRFLOW_AUTH_CLIENT_ID" "$AIRFLOW_AUTH_CLIENT_SECRET" "$AIRFLOW_AUTH_ROOT_URL"
+  ensure_resource_client "$CONTRACTS_API_CLIENT_ID"
+  ensure_direct_grants_client "$CONTRACTS_CLIENT_ID" "$CONTRACTS_CLIENT_SECRET"
+  ensure_public_browser_client \
+    "$CONTRACTS_UI_DEV_CLIENT_ID" \
+    "$CONTRACTS_UI_DEV_ROOT_URL" \
+    "$CONTRACTS_UI_DEV_REDIRECT_URI"
+  ensure_service_client "$AIRFLOW_CONTRACTS_CLIENT_ID" "$AIRFLOW_CONTRACTS_CLIENT_SECRET"
 
   system_roles_client_uuid="$(client_uuid_by_client_id "$SYSTEM_ROLES_CLIENT_ID")"
   minio_client_uuid="$(client_uuid_by_client_id "$MINIO_CLIENT_ID")"
   airflow_sts_client_uuid="$(client_uuid_by_client_id "$AIRFLOW_STS_CLIENT_ID")"
+  airflow_auth_client_uuid="$(client_uuid_by_client_id "$AIRFLOW_AUTH_CLIENT_ID")"
+  contracts_client_uuid="$(client_uuid_by_client_id "$CONTRACTS_CLIENT_ID")"
+  contracts_ui_dev_client_uuid="$(client_uuid_by_client_id "$CONTRACTS_UI_DEV_CLIENT_ID")"
+  airflow_contracts_client_uuid="$(client_uuid_by_client_id "$AIRFLOW_CONTRACTS_CLIENT_ID")"
   ensure_client_role "$system_roles_client_uuid" "producer"
   ensure_client_role "$system_roles_client_uuid" "consumer"
   ensure_client_role "$system_roles_client_uuid" "admin"
   ensure_client_role "$system_roles_client_uuid" "$INGESTION_SYSTEM_ROLE"
+  ensure_client_role "$system_roles_client_uuid" "$CONTRACTS_READER_ROLE"
+  ensure_realm_role "Viewer"
+  ensure_realm_role "User"
+  ensure_realm_role "Op"
+  ensure_realm_role "Admin"
+  ensure_realm_role "SuperAdmin"
   ensure_system_roles_mapper "$minio_client_uuid" "system-roles-claim"
   ensure_system_roles_mapper "$airflow_sts_client_uuid" "system-roles-claim"
-  ensure_audience_mapper "$airflow_sts_client_uuid" "minio-console-audience"
+  ensure_system_roles_mapper "$contracts_client_uuid" "system-roles-claim"
+  ensure_system_roles_mapper "$contracts_ui_dev_client_uuid" "system-roles-claim"
+  ensure_system_roles_mapper "$airflow_contracts_client_uuid" "system-roles-claim"
+  ensure_audience_mapper "$airflow_auth_client_uuid" "airflow-auth-audience" "$AIRFLOW_AUTH_CLIENT_ID"
+  ensure_audience_mapper "$airflow_sts_client_uuid" "minio-console-audience" "$MINIO_CLIENT_ID"
+  ensure_audience_mapper "$contracts_client_uuid" "contracts-api-audience" "$CONTRACTS_API_CLIENT_ID"
+  ensure_audience_mapper "$contracts_ui_dev_client_uuid" "contracts-api-audience" "$CONTRACTS_API_CLIENT_ID"
+  ensure_audience_mapper "$airflow_contracts_client_uuid" "contracts-api-audience" "$CONTRACTS_API_CLIENT_ID"
 
   ensure_user "admin" "admin" "Platform" "Admin" "admin@local.test"
   sync_user_system_roles "admin" "admin"
+  sync_user_realm_roles "admin" "SuperAdmin"
 
   ensure_user "consumer" "consumer" "Data" "Consumer" "consumer@local.test"
   sync_user_system_roles "consumer" "consumer"
+  sync_user_realm_roles "consumer" "User" "Op"
 
   ensure_user "producer" "producer" "Data" "Producer" "producer@local.test"
   sync_user_system_roles "producer" "producer"
+  sync_user_realm_roles "producer" "User"
 
   ensure_user "$MINIO_TEST_USERNAME" "$MINIO_TEST_PASSWORD" "Multi" "Role User" "${MINIO_TEST_USERNAME}@local.test"
   sync_user_system_roles "$MINIO_TEST_USERNAME" "producer" "consumer"
+  sync_user_realm_roles "$MINIO_TEST_USERNAME" "User"
   sync_service_account_system_roles "$AIRFLOW_STS_CLIENT_ID" "$INGESTION_SYSTEM_ROLE"
+  sync_service_account_system_roles "$AIRFLOW_CONTRACTS_CLIENT_ID" "$CONTRACTS_READER_ROLE"
 
   log "Keycloak bootstrap completed"
 }
