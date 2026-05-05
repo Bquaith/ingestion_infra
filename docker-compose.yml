@@ -3,6 +3,14 @@ services:
     image: postgres:16
     container_name: pgdocker
     restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - track_io_timing=on
+      - -c
+      - track_commit_timestamp=on
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -113,6 +121,7 @@ services:
       MINIO_IDENTITY_OPENID_DISPLAY_NAME: Keycloak
       MINIO_IDENTITY_OPENID_REDIRECT_URI: http://localhost:9001/oauth_callback
       MINIO_IDENTITY_OPENID_SCOPES: openid,profile,email
+      MINIO_PROMETHEUS_AUTH_TYPE: public
 
     ports:
       - "9000:9000"
@@ -140,5 +149,80 @@ services:
       - ./minio/policies:/policies:ro
     entrypoint: ["/bin/sh", "/bootstrap/init-minio.sh"]
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_NAME: postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres_exporter/queries.yaml
+    volumes:
+      - ./observability/postgres-exporter/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    ports:
+      - "9187:9187"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    ports:
+      - "8082:8080"
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.1
+    restart: unless-stopped
+    command:
+      - --path.rootfs=/host
+    volumes:
+      - /:/host:ro
+    ports:
+      - "9100:9100"
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    restart: unless-stopped
+    depends_on:
+      postgres-exporter:
+        condition: service_started
+      minio:
+        condition: service_started
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    restart: unless-stopped
+    depends_on:
+      prometheus:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+
 volumes:
   postgres_data:
+  grafana_data:

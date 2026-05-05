@@ -5,6 +5,7 @@
 - `PostgreSQL` как общую СУБД для сервисов и экспериментов
 - `Keycloak` как сервер аутентификации и управления пользователями
 - `MinIO` как S3-совместимое объектное хранилище
+- `Prometheus`, `Grafana`, `postgres_exporter`, `node_exporter`, `cAdvisor` для observability MVP
 
 ### PostgreSQL
 
@@ -72,11 +73,18 @@ docker compose ps -a
 Нормальное состояние:
 
 - `postgres`, `keycloak`, `minio` в `Up`
+- `prometheus`, `grafana`, `postgres-exporter`, `node-exporter`, `cadvisor` в `Up`
 - `postgres-init`, `keycloak-init` в `Exited (0)`
 
-Это важно: `Exited (0)` для init-контейнеров здесь нормально.
-
 ## Доступ к сервисам
+
+### Observability
+
+После `docker compose up -d` доступны:
+
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3000`
+  логин/пароль: `admin / admin`
 
 ### PostgreSQL
 

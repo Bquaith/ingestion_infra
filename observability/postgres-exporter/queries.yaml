@@ -1,0 +1,18 @@
+pg_stat_wal:
+  query: |
+    SELECT
+      wal_bytes,
+      wal_records,
+      wal_fpi
+    FROM pg_stat_wal
+  master: true
+  metrics:
+    - wal_bytes:
+        usage: "COUNTER"
+        description: "Total bytes written to WAL"
+    - wal_records:
+        usage: "COUNTER"
+        description: "Total WAL records generated"
+    - wal_fpi:
+        usage: "COUNTER"
+        description: "Total full page images written to WAL"

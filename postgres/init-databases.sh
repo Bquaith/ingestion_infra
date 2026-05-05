@@ -31,5 +31,14 @@ WHERE NOT EXISTS (
 \gexec
 SQL
 
+  psql \
+    --host="$PGHOST" \
+    --port="$PGPORT" \
+    --username="$PGUSER" \
+    --dbname="$db_name" \
+    --set=ON_ERROR_STOP=1 <<'SQL'
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+SQL
+
   echo "Database '$db_name' is ready"
 done

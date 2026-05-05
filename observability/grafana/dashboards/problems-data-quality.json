@@ -1,0 +1,504 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM ingestion_meta.v_problem_summary WHERE observed_at >= now() - interval '24 hours' AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}');",
+          "refId": "A"
+        }
+      ],
+      "title": "Problem Events 24h",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(DISTINCT run_id) AS value FROM ingestion_meta.v_problem_summary WHERE observed_at >= now() - interval '24 hours' AND problem_type IN ('run_failure', 'stage_failure') AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}');",
+          "refId": "A"
+        }
+      ],
+      "title": "Failed Runs 24h",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(problem_count), 0) AS value FROM ingestion_meta.v_problem_summary WHERE observed_at >= now() - interval '24 hours' AND problem_type = 'invalid_records' AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}');",
+          "refId": "A"
+        }
+      ],
+      "title": "Invalid Records 24h",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COALESCE(SUM(problem_count), 0) AS value FROM ingestion_meta.v_problem_summary WHERE observed_at >= now() - interval '24 hours' AND problem_type = 'quarantined_transactions' AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}');",
+          "refId": "A"
+        }
+      ],
+      "title": "Quarantined Transactions 24h",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(observed_at, '15m'), problem_type AS metric, SUM(problem_count) AS value FROM ingestion_meta.v_problem_summary WHERE $__timeFilter(observed_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') GROUP BY 1, 2 ORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Problem Count By Type",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(observed_at, '15m'), strategy AS metric, SUM(problem_count) AS value FROM ingestion_meta.v_problem_summary WHERE $__timeFilter(observed_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') GROUP BY 1, 2 ORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Problem Count By Strategy",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT observed_at, scope, pipeline_id, strategy, stage_name, problem_type, problem_count, error_artifact_key, LEFT(COALESCE(error_text, ''), 220) AS error_text FROM ingestion_meta.v_problem_summary WHERE ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') ORDER BY observed_at DESC LIMIT 100;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest Problems",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT pipeline_id, strategy, problem_type, COUNT(*) AS occurrences, SUM(problem_count) AS impacted_count, MAX(observed_at) AS last_seen FROM ingestion_meta.v_problem_summary WHERE observed_at >= now() - interval '7 days' AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') GROUP BY 1, 2, 3 ORDER BY impacted_count DESC, occurrences DESC LIMIT 25;",
+          "refId": "A"
+        }
+      ],
+      "title": "Recurring Problem Pipelines",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 22
+      },
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT strategy, stage_name, COUNT(*) AS observed_stages, SUM(invalid_record_count) AS invalid_records, SUM(invalid_transaction_count) AS invalid_transactions, SUM(quarantined_event_count) AS quarantined_events, SUM(quarantined_transaction_count) AS quarantined_transactions, ROUND(AVG(stage_duration_seconds)::numeric, 2) AS avg_stage_duration_seconds FROM ingestion_meta.v_stage_metrics WHERE started_at >= now() - interval '7 days' AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') GROUP BY 1, 2 ORDER BY invalid_records DESC, quarantined_events DESC, avg_stage_duration_seconds DESC LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Stage Data Quality Hotspots",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "mvp",
+    "ingestion",
+    "problems"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": "All",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "All"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "audit-postgres"
+        },
+        "definition": "SELECT DISTINCT strategy AS __text, strategy AS __value FROM ingestion_meta.v_run_metrics ORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Strategy",
+        "multi": false,
+        "name": "strategy",
+        "options": [],
+        "query": "SELECT DISTINCT strategy AS __text, strategy AS __value FROM ingestion_meta.v_run_metrics ORDER BY 1;",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "All",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "All"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "audit-postgres"
+        },
+        "definition": "SELECT DISTINCT pipeline_id AS __text, pipeline_id AS __value FROM ingestion_meta.v_run_metrics ORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Pipeline",
+        "multi": false,
+        "name": "pipeline",
+        "options": [],
+        "query": "SELECT DISTINCT pipeline_id AS __text, pipeline_id AS __value FROM ingestion_meta.v_run_metrics ORDER BY 1;",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Problems & Data Quality",
+  "uid": "problems-data-quality-mvp",
+  "version": 1,
+  "weekStart": ""
+}

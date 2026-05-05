@@ -1,0 +1,486 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT COUNT(*) AS value FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}');",
+          "refId": "A"
+        }
+      ],
+      "title": "Runs In Range",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(AVG(run_duration_seconds)::numeric, 2) AS value FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}');",
+          "refId": "A"
+        }
+      ],
+      "title": "Average Run Duration",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(AVG(CASE WHEN run_duration_seconds > 0 THEN read_count::double precision / run_duration_seconds END)::numeric, 2) AS value FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}');",
+          "refId": "A"
+        }
+      ],
+      "title": "Average Throughput",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT ROUND(AVG(CASE WHEN source_input_count > 0 THEN invalid_record_count::double precision / source_input_count END)::numeric, 4) AS value FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}');",
+          "refId": "A"
+        }
+      ],
+      "title": "Average Invalid Ratio",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(started_at, '15m'), strategy AS metric, AVG(CASE WHEN run_duration_seconds > 0 THEN read_count::double precision / run_duration_seconds END) AS value FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') GROUP BY 1, 2 ORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Throughput By Strategy",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(started_at, '15m'), strategy AS metric, AVG(CASE WHEN source_input_count > 0 THEN invalid_record_count::double precision / source_input_count END) AS value FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') GROUP BY 1, 2 ORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Invalid Ratio By Strategy",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(started_at, '15m'), strategy AS metric, AVG(CASE WHEN read_count > 0 THEN (insert_count + update_count + delete_count)::double precision / read_count END) AS value FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') GROUP BY 1, 2 ORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Change Ratio By Strategy",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(started_at, '15m'), strategy || ' / ' || stage_name AS metric, AVG(stage_duration_seconds) AS value FROM ingestion_meta.v_stage_metrics WHERE $__timeFilter(started_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') GROUP BY 1, 2 ORDER BY 1;",
+          "refId": "A"
+        }
+      ],
+      "title": "Stage Duration Hotspots",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 9,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT strategy, status, COUNT(*) AS runs, ROUND(AVG(run_duration_seconds)::numeric, 2) AS avg_run_duration_seconds, SUM(read_count) AS total_read_count, SUM(insert_count + update_count + delete_count) AS total_change_count, ROUND(AVG(CASE WHEN source_input_count > 0 THEN invalid_record_count::double precision / source_input_count END)::numeric, 4) AS avg_invalid_ratio FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') GROUP BY 1, 2 ORDER BY 1, 2;",
+          "refId": "A"
+        }
+      ],
+      "title": "Status Breakdown",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 10,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT started_at, pipeline_id, strategy, run_mode, status, ROUND(run_duration_seconds::numeric, 2) AS run_duration_seconds, read_count, ROUND((CASE WHEN run_duration_seconds > 0 THEN read_count::double precision / run_duration_seconds END)::numeric, 2) AS records_per_second, ROUND((CASE WHEN source_input_count > 0 THEN invalid_record_count::double precision / source_input_count END)::numeric, 4) AS invalid_ratio, ROUND((CASE WHEN read_count > 0 THEN (insert_count + update_count + delete_count)::double precision / read_count END)::numeric, 4) AS change_ratio, artifact_total_bytes FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') ORDER BY started_at DESC LIMIT 50;",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent Run Comparison",
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "mvp",
+    "ingestion",
+    "strategy"
+  ],
+  "templating": {
+    "list": [
+      {
+        "allValue": "All",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "All"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "audit-postgres"
+        },
+        "definition": "SELECT DISTINCT strategy AS __text, strategy AS __value FROM ingestion_meta.v_run_metrics ORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Strategy",
+        "multi": false,
+        "name": "strategy",
+        "options": [],
+        "query": "SELECT DISTINCT strategy AS __text, strategy AS __value FROM ingestion_meta.v_run_metrics ORDER BY 1;",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": "All",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "All"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "audit-postgres"
+        },
+        "definition": "SELECT DISTINCT pipeline_id AS __text, pipeline_id AS __value FROM ingestion_meta.v_run_metrics ORDER BY 1;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Pipeline",
+        "multi": false,
+        "name": "pipeline",
+        "options": [],
+        "query": "SELECT DISTINCT pipeline_id AS __text, pipeline_id AS __value FROM ingestion_meta.v_run_metrics ORDER BY 1;",
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Strategy Comparison",
+  "uid": "strategy-comparison-mvp",
+  "version": 1,
+  "weekStart": ""
+}
