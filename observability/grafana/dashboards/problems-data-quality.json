@@ -432,6 +432,40 @@
       ],
       "title": "Stage Data Quality Hotspots",
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "audit-postgres"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 10,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT observed_at, run_id, pipeline_id, strategy, stage_name, row_number, field, code, LEFT(message, 220) AS message, \"constraint\", actual_value FROM ingestion_meta.v_validation_errors WHERE $__timeFilter(observed_at) AND ('${strategy}' = 'All' OR strategy = '${strategy}') AND ('${pipeline}' = 'All' OR pipeline_id = '${pipeline}') ORDER BY observed_at DESC, row_number ASC NULLS LAST LIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Latest Validation Error Rows",
+      "type": "table"
     }
   ],
   "refresh": "30s",
@@ -499,6 +533,6 @@
   "timezone": "browser",
   "title": "Problems & Data Quality",
   "uid": "problems-data-quality-mvp",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
