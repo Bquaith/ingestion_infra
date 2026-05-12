@@ -5,14 +5,10 @@ readonly PGHOST="${PGHOST:-postgres}"
 readonly PGPORT="${PGPORT:-5432}"
 readonly PGUSER="${PGUSER:-postgres}"
 readonly PGDATABASE="${PGDATABASE:-postgres}"
+readonly POSTGRES_DATABASES="${POSTGRES_DATABASES:-keycloak test_data_set data_contracts data_lake dag_audit}"
 
-databases=(
-  keycloak
-  test_data_set
-  data_contracts
-  data_lake
-  dag_audit
-)
+normalized_databases="$(printf '%s\n' "${POSTGRES_DATABASES}" | tr ',' ' ')"
+read -r -a databases <<< "${normalized_databases}"
 
 for db_name in "${databases[@]}"; do
   psql \

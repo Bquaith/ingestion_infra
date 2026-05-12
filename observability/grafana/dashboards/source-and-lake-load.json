@@ -26,9 +26,10 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Container CPU by current Docker container id. If postgres containers are recreated, these ids must be refreshed.",
       "fieldConfig": {
         "defaults": {
-          "unit": "percent"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -41,24 +42,31 @@
       "id": 1,
       "options": {
         "legend": {
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom"
         },
         "tooltip": {
-          "mode": "single",
-          "sort": "none"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
         {
           "editorMode": "code",
-          "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{job=\"node\", mode=\"idle\"}[5m])))",
-          "legendFormat": "host cpu busy",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\",cpu=\"total\",id=\"/docker/e5abcbcce117636416b98a0325d21ce6310022ac05d7997e9a564db3b81de197\"}[5m]))",
+          "legendFormat": "source cpu",
           "range": true,
           "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{job=\"cadvisor\",cpu=\"total\",id=\"/docker/97eb820eff68adad493bad5aceaba372d68899e0441fbf1d46876e1865cdddf3\"}[5m]))",
+          "legendFormat": "lake cpu",
+          "range": true,
+          "refId": "B"
         }
       ],
-      "title": "Host CPU Busy",
+      "title": "Postgres Container CPU",
       "type": "timeseries"
     },
     {
@@ -66,9 +74,10 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Container RAM by current Docker container id. If postgres containers are recreated, these ids must be refreshed.",
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps"
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -92,20 +101,20 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(node_network_receive_bytes_total{job=\"node\", device!~\"lo\"}[5m]))",
-          "legendFormat": "rx",
+          "expr": "container_memory_working_set_bytes{job=\"cadvisor\",id=\"/docker/e5abcbcce117636416b98a0325d21ce6310022ac05d7997e9a564db3b81de197\"}",
+          "legendFormat": "source ram",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "sum(rate(node_network_transmit_bytes_total{job=\"node\", device!~\"lo\"}[5m]))",
-          "legendFormat": "tx",
+          "expr": "container_memory_working_set_bytes{job=\"cadvisor\",id=\"/docker/97eb820eff68adad493bad5aceaba372d68899e0441fbf1d46876e1865cdddf3\"}",
+          "legendFormat": "lake ram",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "Host Network Throughput",
+      "title": "Postgres Container RAM",
       "type": "timeseries"
     },
     {
@@ -113,9 +122,10 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Per-container network metrics are not exposed by the current cAdvisor setup, so disk I/O is shown here instead.",
       "fieldConfig": {
         "defaults": {
-          "unit": "short"
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -139,13 +149,34 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum by (datname) (pg_stat_database_numbackends{job=\"postgres\", datname!=\"\"})",
-          "legendFormat": "{{datname}}",
+          "expr": "sum(rate(container_fs_reads_bytes_total{job=\"cadvisor\",id=\"/docker/e5abcbcce117636416b98a0325d21ce6310022ac05d7997e9a564db3b81de197\",device!~\"tmpfs|overlay\"}[5m]))",
+          "legendFormat": "source read",
           "range": true,
           "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(container_fs_writes_bytes_total{job=\"cadvisor\",id=\"/docker/e5abcbcce117636416b98a0325d21ce6310022ac05d7997e9a564db3b81de197\",device!~\"tmpfs|overlay\"}[5m]))",
+          "legendFormat": "source write",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(container_fs_reads_bytes_total{job=\"cadvisor\",id=\"/docker/97eb820eff68adad493bad5aceaba372d68899e0441fbf1d46876e1865cdddf3\",device!~\"tmpfs|overlay\"}[5m]))",
+          "legendFormat": "lake read",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(container_fs_writes_bytes_total{job=\"cadvisor\",id=\"/docker/97eb820eff68adad493bad5aceaba372d68899e0441fbf1d46876e1865cdddf3\",device!~\"tmpfs|overlay\"}[5m]))",
+          "legendFormat": "lake write",
+          "range": true,
+          "refId": "D"
         }
       ],
-      "title": "PostgreSQL Connections By Database",
+      "title": "Postgres Container Disk I/O",
       "type": "timeseries"
     },
     {
@@ -155,7 +186,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -179,20 +210,20 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(node_disk_read_bytes_total{job=\"node\", device!~\"loop.*|ram.*\"}[5m]))",
-          "legendFormat": "read",
+          "expr": "sum(pg_stat_database_numbackends{job=\"postgres-source\",datname=\"source_data\"})",
+          "legendFormat": "source connections",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "sum(rate(node_disk_written_bytes_total{job=\"node\", device!~\"loop.*|ram.*\"}[5m]))",
-          "legendFormat": "write",
+          "expr": "sum(pg_stat_database_numbackends{job=\"postgres\",datname=~\"data_lake|dag_audit\"})",
+          "legendFormat": "lake connections",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "Host Disk Throughput",
+      "title": "Connections",
       "type": "timeseries"
     },
     {
@@ -202,7 +233,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ops"
+          "unit": "Bps"
         },
         "overrides": []
       },
@@ -226,20 +257,20 @@
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(pg_stat_database_tup_returned{job=\"postgres\"}[5m]))",
-          "legendFormat": "rows returned",
+          "expr": "sum(rate(pg_stat_wal_wal_bytes{job=\"postgres-source\"}[5m]))",
+          "legendFormat": "source wal bytes/s",
           "range": true,
           "refId": "A"
         },
         {
           "editorMode": "code",
-          "expr": "sum(rate(pg_stat_database_tup_inserted{job=\"postgres\"}[5m])) + sum(rate(pg_stat_database_tup_updated{job=\"postgres\"}[5m])) + sum(rate(pg_stat_database_tup_deleted{job=\"postgres\"}[5m]))",
-          "legendFormat": "rows changed",
+          "expr": "sum(rate(pg_stat_wal_wal_bytes{job=\"postgres\"}[5m]))",
+          "legendFormat": "lake wal bytes/s",
           "range": true,
           "refId": "B"
         }
       ],
-      "title": "PostgreSQL Tuple Activity",
+      "title": "WAL Growth",
       "type": "timeseries"
     },
     {
@@ -249,7 +280,7 @@
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps"
+          "unit": "ops"
         },
         "overrides": []
       },
@@ -262,30 +293,37 @@
       "id": 6,
       "options": {
         "legend": {
-          "displayMode": "list",
+          "displayMode": "table",
           "placement": "bottom"
         },
         "tooltip": {
-          "mode": "single",
-          "sort": "none"
+          "mode": "multi",
+          "sort": "desc"
         }
       },
       "targets": [
         {
           "editorMode": "code",
-          "expr": "sum(rate(pg_stat_wal_wal_bytes{job=\"postgres\"}[5m]))",
-          "legendFormat": "wal bytes/s",
+          "expr": "sum(rate(pg_stat_database_tup_returned{job=\"postgres-source\",datname=\"source_data\"}[5m]))",
+          "legendFormat": "source rows returned/s",
           "range": true,
           "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "sum(rate(pg_stat_database_tup_inserted{job=\"postgres\",datname=~\"data_lake|dag_audit\"}[5m])) + sum(rate(pg_stat_database_tup_updated{job=\"postgres\",datname=~\"data_lake|dag_audit\"}[5m])) + sum(rate(pg_stat_database_tup_deleted{job=\"postgres\",datname=~\"data_lake|dag_audit\"}[5m]))",
+          "legendFormat": "lake rows changed/s",
+          "range": true,
+          "refId": "B"
         }
       ],
-      "title": "PostgreSQL WAL Growth",
+      "title": "Source Reads vs Lake Writes",
       "type": "timeseries"
     },
     {
       "datasource": {
-        "type": "postgres",
-        "uid": "audit-postgres"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -294,105 +332,81 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 5,
         "w": 12,
         "x": 0,
         "y": 16
       },
       "id": 7,
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "textMode": "value_and_name"
       },
       "targets": [
         {
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT $__timeGroupAlias(started_at, '15m'), strategy AS metric, SUM(artifact_total_bytes) AS value FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) GROUP BY 1, 2 ORDER BY 1;",
+          "editorMode": "code",
+          "expr": "pg_database_size_bytes{job=\"postgres-source\",datname=\"source_data\"}",
+          "legendFormat": "source_data",
+          "range": true,
           "refId": "A"
         }
       ],
-      "title": "Landing Artifact Bytes By Strategy",
-      "type": "timeseries"
+      "title": "Source DB Size",
+      "type": "stat"
     },
     {
       "datasource": {
-        "type": "postgres",
-        "uid": "audit-postgres"
+        "type": "prometheus",
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "ops"
+          "unit": "bytes"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 5,
         "w": 12,
         "x": 12,
         "y": 16
       },
       "id": 8,
       "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "bottom"
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
+        "textMode": "value_and_name"
       },
       "targets": [
         {
-          "format": "time_series",
-          "rawQuery": true,
-          "rawSql": "SELECT $__timeGroupAlias(started_at, '15m'), strategy AS metric, SUM(insert_count + update_count + delete_count) AS value FROM ingestion_meta.v_run_metrics WHERE $__timeFilter(started_at) GROUP BY 1, 2 ORDER BY 1;",
+          "editorMode": "code",
+          "expr": "sum(pg_database_size_bytes{job=\"postgres\",datname=~\"data_lake|dag_audit\"})",
+          "legendFormat": "lake databases",
+          "range": true,
           "refId": "A"
         }
       ],
-      "title": "Lake Row Mutations By Strategy",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "audit-postgres"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 24,
-        "x": 0,
-        "y": 24
-      },
-      "id": 9,
-      "options": {
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
-        },
-        "showHeader": true
-      },
-      "targets": [
-        {
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT strategy, pipeline_id, COUNT(*) AS runs, SUM(read_count) AS total_read_count, SUM(insert_count + update_count + delete_count) AS total_change_count, SUM(artifact_total_bytes) AS artifact_total_bytes, ROUND(AVG(run_duration_seconds)::numeric, 2) AS avg_run_duration_seconds FROM ingestion_meta.v_run_metrics WHERE started_at >= now() - interval '24 hours' GROUP BY 1, 2 ORDER BY artifact_total_bytes DESC, total_read_count DESC LIMIT 25;",
-          "refId": "A"
-        }
-      ],
-      "title": "Top Pipelines By Load (24h)",
-      "type": "table"
+      "title": "Lake DB Size",
+      "type": "stat"
     }
   ],
   "refresh": "30s",
@@ -400,8 +414,9 @@
   "style": "dark",
   "tags": [
     "mvp",
-    "infra",
-    "load"
+    "ingestion",
+    "source",
+    "lake"
   ],
   "templating": {
     "list": []
@@ -413,6 +428,6 @@
   "timezone": "browser",
   "title": "Source & Lake Load",
   "uid": "source-and-lake-load-mvp",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

@@ -42,6 +42,50 @@ services:
       - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
     entrypoint: ["/bin/bash", "/docker-entrypoint-initdb.d/init-databases.sh"]
 
+  source-postgres:
+    image: postgres:16
+    container_name: pgsource
+    restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - track_io_timing=on
+      - -c
+      - track_commit_timestamp=on
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - source_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  source-postgres-init:
+    image: postgres:16
+    restart: "no"
+    depends_on:
+      source-postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: source-postgres
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+      POSTGRES_DATABASES: source_data
+    volumes:
+      - ./postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    entrypoint: ["/bin/bash", "/docker-entrypoint-initdb.d/init-databases.sh"]
+
   keycloak:
     image: quay.io/keycloak/keycloak:26.1
     container_name: keycloak
@@ -163,6 +207,20 @@ services:
     ports:
       - "9187:9187"
 
+  source-postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    restart: unless-stopped
+    depends_on:
+      source-postgres:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_NAME: postgresql://postgres:postgres@source-postgres:5432/postgres?sslmode=disable
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres_exporter/queries.yaml
+    volumes:
+      - ./observability/postgres-exporter/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    ports:
+      - "9188:9187"
+
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     restart: unless-stopped
@@ -193,6 +251,8 @@ services:
     restart: unless-stopped
     depends_on:
       postgres-exporter:
+        condition: service_started
+      source-postgres-exporter:
         condition: service_started
       minio:
         condition: service_started
@@ -225,4 +285,5 @@ services:
 
 volumes:
   postgres_data:
+  source_postgres_data:
   grafana_data:

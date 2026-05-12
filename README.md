@@ -2,14 +2,14 @@
 
 Этот репозиторий поднимает базовую инфраструктуру для проекта по контрактно-ориентированной интеграции данных:
 
-- `PostgreSQL` как общую СУБД для сервисов и экспериментов
+- `PostgreSQL` как основную СУБД для lake/services и отдельный `PostgreSQL` для source
 - `Keycloak` как сервер аутентификации и управления пользователями
 - `MinIO` как S3-совместимое объектное хранилище
 - `Prometheus`, `Grafana`, `postgres_exporter`, `node_exporter`, `cAdvisor` для observability MVP
 
 ### PostgreSQL
 
-Создаются базы:
+В основном PostgreSQL-инстансе на `localhost:5432` автоматически создаются базы:
 
 - `keycloak`
 - `test_data_set`
@@ -17,7 +17,11 @@
 - `data_lake`
 - `dag_audit`
 
-Они создаются автоматически при `docker compose up`, если их еще нет.
+Во втором PostgreSQL-инстансе для source-нагрузки на `localhost:5433` автоматически создаётся база:
+
+- `source_data`
+
+Обе группы баз создаются автоматически при `docker compose up`, если их еще нет.
 
 ### Keycloak
 
@@ -72,9 +76,9 @@ docker compose ps -a
 
 Нормальное состояние:
 
-- `postgres`, `keycloak`, `minio` в `Up`
-- `prometheus`, `grafana`, `postgres-exporter`, `node-exporter`, `cadvisor` в `Up`
-- `postgres-init`, `keycloak-init` в `Exited (0)`
+- `postgres`, `source-postgres`, `keycloak`, `minio` в `Up`
+- `prometheus`, `grafana`, `postgres-exporter`, `source-postgres-exporter`, `node-exporter`, `cadvisor` в `Up`
+- `postgres-init`, `source-postgres-init`, `keycloak-init` в `Exited (0)`
 
 ## Доступ к сервисам
 
@@ -88,10 +92,17 @@ docker compose ps -a
 
 ### PostgreSQL
 
-- Host: `localhost`
-- Port: `5432`
-- User: `postgres`
-- Password: `postgres`
+- Основной PostgreSQL:
+  - Host: `localhost`
+  - Port: `5432`
+  - User: `postgres`
+  - Password: `postgres`
+- Source PostgreSQL:
+  - Host: `localhost`
+  - Port: `5433`
+  - User: `postgres`
+  - Password: `postgres`
+  - Database: `source_data`
 
 ### Keycloak
 

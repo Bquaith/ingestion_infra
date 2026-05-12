@@ -13,6 +13,11 @@ scrape_configs:
       - targets:
           - postgres-exporter:9187
 
+  - job_name: postgres-source
+    static_configs:
+      - targets:
+          - source-postgres-exporter:9187
+
   - job_name: cadvisor
     static_configs:
       - targets:
